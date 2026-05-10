@@ -63,7 +63,7 @@ run: BOOTX64.EFI
 
 	qemu-system-x86_64 \
 	-bios /usr/share/qemu/OVMF.fd \
-	-hda fat:rw:image
+	-hda fat:rw:image -nographic
 
 clean:
 	rm -f *.o *.so *.EFI
