@@ -1,5 +1,9 @@
 #include <efi.h>
 #include <efilib.h>
+#include "../kernel/elf.hpp"
+void Halt(void) {
+  while (1) __asm__("hlt");
+}
 
 EFI_FILE_PROTOCOL *LoadFile(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, CHAR16* FileName){
 
@@ -107,15 +111,24 @@ VOID* Buffer = (VOID*)KernelBuffer;
 
  status = ReadFile(kernel,Buffer ,&BufferSize,SystemTable);
 
+if (EFI_ERROR(status)) {
+    Print(L"[-] Failed to read kernel file into buffer. Status: %r\n", status);
+    return status;
+}
 
-Print(L"Kernel loaded into memory at address: %p\n", Buffer);
-Print(L"Kernel contains : %a\n", Buffer);
+Elf64_Ehdr *elf_header = (Elf64_Ehdr *)Buffer;
+
+if(elf_header->e_ident[0] == 0x7F &&
+        elf_header->e_ident[1] == 'E' &&
+        elf_header->e_ident[2] == 'L' &&
+        elf_header->e_ident[3] == 'F'){
+            Print(L"[+] Valid ELF Kernel is Loaded.\n");
+            Print(L"Entry point : 0x%llx\n",elf_header->e_entry);
+        }
+        else  Print(L"[!] Not a valid Kernel ELF File.\n");
 
 
-    while (1)
-    {
-        __asm__ __volatile__("hlt");
-    }
+Halt();
 
     return EFI_SUCCESS;
 }
