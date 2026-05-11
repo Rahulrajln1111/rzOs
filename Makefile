@@ -57,13 +57,13 @@ BOOTX64.EFI: bootloader.so
 	bootloader.so \
 	BOOTX64.EFI
 
-run: BOOTX64.EFI
+run: BOOTX64.EFI kernel.bin
 	mkdir -p image/EFI/BOOT
 	cp BOOTX64.EFI image/EFI/BOOT/
-
+	cp kernel.bin image/ 
 	qemu-system-x86_64 \
+	-m 256M \
 	-bios /usr/share/qemu/OVMF.fd \
 	-hda fat:rw:image -nographic
-
 clean:
 	rm -f *.o *.so *.EFI
