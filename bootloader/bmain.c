@@ -53,22 +53,6 @@ return KernelFile;
 
 }
 
-EFI_STATUS ReadFile(EFI_FILE_PROTOCOL *File, VOID *Buffer, UINTN *BufferSize,EFI_SYSTEM_TABLE *SystemTable) {
-
-
-    //Read the file into the buffer
-    EFI_STATUS status = uefi_call_wrapper(File->Read,3,File, BufferSize, Buffer);
-    if (EFI_ERROR(status)) {
-        Print(L"[-] Failed to read file into buffer.\n");
-        SystemTable->BootServices->FreePool(Buffer);
-        return status;
-    } 
-    
-    return EFI_SUCCESS;
-
-   
-}
-
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
 
@@ -82,39 +66,81 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     Print(L"Loading Kernel Files\n");
 
 
-EFI_FILE_PROTOCOL *kernel = LoadFile(ImageHandle,SystemTable,L"kernel.bin");
+EFI_FILE_PROTOCOL *kernel = LoadFile(ImageHandle, SystemTable, L"kernel.elf");
 
-if (kernel != NULL) {
-        
-        Print(L"[+] kernel.bin located on the hard drive! \n");
-    } else {
-        Print(L"[!] Kernel is missing. System Halting.\n");
+if (kernel == NULL) {
+    Print(L"[!] Kernel is missing. System Halting.\n");
+    Halt();
+    return EFI_LOAD_ERROR; /* unreachable, but explicit for safety */
+}
+Print(L"[+] kernel.elf located on the hard drive!\n");
+
+// Query the real kernel file size instead of hardcoding a 1MB buffer.
+UINTN InfoSize = 0;
+EFI_FILE_INFO *FileInfo = NULL;
+EFI_STATUS status = uefi_call_wrapper(kernel->GetInfo, 4,
+                                      kernel, &gEfiFileInfoGuid, &InfoSize, FileInfo);
+
+if (status == EFI_BUFFER_TOO_SMALL) {
+    status = uefi_call_wrapper(SystemTable->BootServices->AllocatePool, 3,
+                               EfiLoaderData, InfoSize, (VOID **)&FileInfo);
+    if (EFI_ERROR(status)) {
+        Print(L"[-] Failed to allocate file info buffer. Status: %r\n", status);
+        return status;
     }
+    status = uefi_call_wrapper(kernel->GetInfo, 4,
+                               kernel, &gEfiFileInfoGuid, &InfoSize, FileInfo);
+}
+if (EFI_ERROR(status)) {
+    Print(L"[-] Failed to get kernel file info. Status: %r\n", status);
+    if (FileInfo != NULL)
+        uefi_call_wrapper(SystemTable->BootServices->FreePool, 1, FileInfo);
+    return status;
+}
 
-UINTN BufferSize = 1024 * 1024; // 1MB buffer
-UINTN Pages = (BufferSize + 4095) / 4096; // Calculate how many 4KB pages you need for 1MB
-EFI_PHYSICAL_ADDRESS KernelBuffer;
+UINTN FileSize = (UINTN)FileInfo->FileSize;
+uefi_call_wrapper(SystemTable->BootServices->FreePool, 1, FileInfo);
+Print(L"[+] Kernel file size: %llu bytes\n", (UINT64)FileSize);
 
-EFI_STATUS status = uefi_call_wrapper(SystemTable->BootServices->AllocatePages,4,
-                           AllocateAnyPages,
-                           EfiLoaderData,
-                           Pages,
-                           &KernelBuffer);
+if (FileSize < sizeof(Elf64_Ehdr)) {
+    Print(L"[-] Kernel file too small to be a valid ELF.\n");
+    return EFI_LOAD_ERROR;
+}
 
+// Allocate exactly enough pages for the file.
+UINTN Pages = (FileSize + EFI_PAGE_SIZE - 1) / EFI_PAGE_SIZE;
+EFI_PHYSICAL_ADDRESS KernelBuffer = 0;
+
+status = uefi_call_wrapper(SystemTable->BootServices->AllocatePages, 4,
+                           AllocateAnyPages, EfiLoaderData, Pages, &KernelBuffer);
 if (EFI_ERROR(status)) {
     Print(L"[-] Failed to allocate pages. Status: %r\n", status);
     return status;
 }
 
-VOID* Buffer = (VOID*)KernelBuffer;
+VOID *Buffer = (VOID *)(UINTN)KernelBuffer;
 
+// Read the whole file into memory, handling short reads.
+UINTN TotalRead = 0;
+while (TotalRead < FileSize) {
+    UINTN ChunkSize = FileSize - TotalRead;
 
- status = ReadFile(kernel,Buffer ,&BufferSize,SystemTable);
-
-if (EFI_ERROR(status)) {
-    Print(L"[-] Failed to read kernel file into buffer. Status: %r\n", status);
-    return status;
+    status = uefi_call_wrapper(kernel->Read, 3,
+                               kernel, &ChunkSize, (UINT8 *)Buffer + TotalRead);
+    if (EFI_ERROR(status)) {
+        Print(L"[-] Failed to read kernel file. Status: %r\n", status);
+        uefi_call_wrapper(SystemTable->BootServices->FreePages, 2, KernelBuffer, Pages);
+        return status;
+    }
+    if (ChunkSize == 0) {
+        Print(L"[-] Unexpected end of file (read %llu of %llu bytes).\n",
+              (UINT64)TotalRead, (UINT64)FileSize);
+        uefi_call_wrapper(SystemTable->BootServices->FreePages, 2, KernelBuffer, Pages);
+        return EFI_LOAD_ERROR;
+    }
+    TotalRead += ChunkSize;
 }
+Print(L"[+] Loaded %llu bytes into memory.\n", (UINT64)TotalRead);
 
 Elf64_Ehdr *elf_header = (Elf64_Ehdr *)Buffer;
 

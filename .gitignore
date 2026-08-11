@@ -1,0 +1,14 @@
+# Limine (vendored via git clone)
+limine/
+
+# Build artifacts
+*.o
+*.so
+*.elf
+*.EFI
+*.bin
+bmain.o
+bootloader.so
+
+# Generated image output (ESP contents)
+image/
