@@ -58,7 +58,7 @@ OBJS   := $(C_SRCS:.c=.o) $(S_SRCS:.S=.o)
 
 # 'image' collides with the image/ directory, so it must be phony
 # or make will consider it up-to-date and skip the copy steps.
-.PHONY: all image run debug clean distclean
+.PHONY: all image run debug clean distclean check
 
 all: image
 
@@ -126,6 +126,19 @@ debug: image
 	-s \
 	-S \
 	-serial stdio
+
+# =========================================================
+# HEADER CHECK - force-use compile of every public header.
+# GCC never compiles an unused header; this harness calls
+# every function in the public headers so a broken header
+# cannot hide from the build. (Linux: make headers_check.)
+# =========================================================
+
+check: check_headers.o
+	@echo "headers clean"
+
+check_headers.o: tests/check_headers.c
+	$(CC) $(KERNEL_CFLAGS) $< -o $@
 
 # =========================================================
 # CLEAN
