@@ -1,0 +1,35 @@
+/*
+ * arch/x86_64/cpu/trapnr.h
+ *
+ * Exception vector numbers. This is the "needy part" taken from
+ * Linux's arch/x86/include/asm/trapnr.h (same names, same values),
+ * so code that references X86_TRAP_* reads identically to upstream.
+ */
+#ifndef _ASM_TRAPNR_H
+#define _ASM_TRAPNR_H
+
+#define X86_TRAP_DE      0      /* Divide Error */
+#define X86_TRAP_DB      1      /* Debug */
+#define X86_TRAP_NMI     2      /* Non-Maskable Interrupt */
+#define X86_TRAP_BP      3      /* Breakpoint */
+#define X86_TRAP_OF      4      /* Overflow */
+#define X86_TRAP_BR      5      /* BOUND Range Exceeded */
+#define X86_TRAP_UD      6      /* Invalid Opcode */
+#define X86_TRAP_NM      7      /* Device Not Available */
+#define X86_TRAP_DF      8      /* Double Fault */
+#define X86_TRAP_OLD_MF  9      /* Coprocessor Segment Overrun */
+#define X86_TRAP_TS      10     /* Invalid TSS */
+#define X86_TRAP_NP      11     /* Segment Not Present */
+#define X86_TRAP_SS      12     /* Stack-Segment Fault */
+#define X86_TRAP_GP      13     /* General Protection Fault */
+#define X86_TRAP_PF      14     /* Page Fault */
+#define X86_TRAP_SPUR    15     /* Spurious Interrupt */
+#define X86_TRAP_MF      16     /* x87 Floating-Point Exception */
+#define X86_TRAP_AC      17     /* Alignment Check */
+#define X86_TRAP_MC      18     /* Machine Check */
+#define X86_TRAP_XF      19     /* SIMD Floating-Point Exception */
+#define X86_TRAP_VE      20     /* Virtualization Exception */
+#define X86_TRAP_CP      21     /* Control Protection Exception */
+#define X86_TRAP_VC      29     /* VMM Communication Exception */
+
+#endif /* _ASM_TRAPNR_H */

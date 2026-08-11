@@ -34,6 +34,8 @@ KERNEL_CFLAGS = \
 	-mcmodel=kernel \
 	-Wall \
 	-Wextra \
+	-Iinclude \
+	-Iarch \
 	-I$(LIMINE_DIR) \
 	-c
 
@@ -42,7 +44,13 @@ KERNEL_LDFLAGS = \
 	-static \
 	-z max-page-size=0x1000 \
 	--gc-sections \
-	-T kernel/linker.ld
+	-T arch/x86_64/boot/linker.ld
+
+# Source discovery: every .c/.S under the Linux-style tree layout.
+# (mm/ added for the memory-management milestone.)
+C_SRCS := $(shell find kernel lib drivers mm arch -type f -name '*.c' | sort)
+S_SRCS := $(shell find arch -type f -name '*.S' | sort)
+OBJS   := $(C_SRCS:.c=.o) $(S_SRCS:.S=.o)
 
 # =========================
 # Targets
@@ -50,7 +58,7 @@ KERNEL_LDFLAGS = \
 
 # 'image' collides with the image/ directory, so it must be phony
 # or make will consider it up-to-date and skip the copy steps.
-.PHONY: all image run debug clean
+.PHONY: all image run debug clean distclean
 
 all: image
 
@@ -58,11 +66,16 @@ all: image
 # KERNEL
 # =========================================================
 
-kernel.o: kernel/kmain.c | $(LIMINE_DIR)
+%.o: %.c
+	@mkdir -p $(dir $@)
 	$(CC) $(KERNEL_CFLAGS) $< -o $@
 
-kernel.elf: kernel.o
-	$(LD) $(KERNEL_LDFLAGS) -o $@ kernel.o
+%.o: %.S
+	@mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) $< -o $@
+
+kernel.elf: $(OBJS)
+	$(LD) $(KERNEL_LDFLAGS) -o $@ $(OBJS)
 
 # =========================================================
 # LIMINE
@@ -119,6 +132,7 @@ debug: image
 # =========================================================
 
 clean:
+	find kernel lib drivers arch -name '*.o' -delete 2>/dev/null || true
 	rm -f *.o *.elf
 	rm -rf image/EFI
 
