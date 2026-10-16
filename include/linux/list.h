@@ -63,4 +63,8 @@ static inline int list_empty(const struct list_head *head)
     for (pos = (head)->next, n = pos->next; pos != (head); \
          pos = n, n = pos->next)
 
+/* Return the first entry in a list, or NULL if the list is empty. */
+#define list_first_entry(ptr, type, member) \
+    (!list_empty(ptr) ? list_entry((ptr)->next, type, member) : NULL)
+
 #endif

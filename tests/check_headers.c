@@ -13,6 +13,7 @@
  * (Linux analogue: 'make headers_check', subsystem selftests.)
  */
 #include <linux/list.h>
+#include <linux/mmzone.h>
 #include <linux/memblock.h>
 #include <kernel/atomic.h>
 #include <kernel/types.h>
@@ -79,6 +80,64 @@ void check_percpu_helpers(void)
     (void)this_cpu_ptr(&check_cpu_counter);
     (void)smp_processor_id();
     (void)setup_per_cpu;
+}
+
+/* mmzone: force-use every shape the buddy allocator will touch,
+ * with the real Linux field names (PAGE_SHIFT, node_mem_map,
+ * node_zonelists, ...) so name drift can't hide from make check.
+ * Note: we READ z->per_cpu_pageset instead of storing into it -
+ * writing a local's address into the __percpu pointer trips a
+ * -Wdangling-pointer warning in the harness itself. */
+static struct page check_vmemmap_pool[16];
+
+void check_mmzone_helpers(void)
+{
+    unsigned long shift = PAGE_SHIFT;
+    unsigned long sz = PAGE_SIZE;
+    unsigned long msk = PAGE_MASK;
+    (void)shift; (void)sz; (void)msk;
+
+    pg_data_t *node = NODE_DATA(0);
+    struct zone *z = &node->node_zones[ZONE_NORMAL];
+    z->zone_start_pfn = 0;
+    z->spanned_pages = sz >> shift;
+    z->present_pages = z->spanned_pages;
+    z->_watermark[WMARK_MIN] = 0;
+    z->_watermark[WMARK_LOW] = 1;
+    z->_watermark[WMARK_HIGH] = 2;
+    z->zone_pgdat = node;
+    z->name = "NORMAL";
+    node->node_mem_map = check_vmemmap_pool;
+    node->nr_zones = MAX_NR_ZONES;
+
+    struct zonelist *zl = node->node_zonelists;
+    struct zoneref *ref = &zl->_zonerefs[0];
+    ref->zone = z;
+    ref->zone_idx = ZONE_NORMAL;
+
+    struct page *p = pfn_to_page(0);
+    (void)page_to_pfn(p);
+    atomic_inc(&p->_refcount);
+    p->flags = 0;
+
+    struct free_area *fa = &z->free_area[0];
+    INIT_LIST_HEAD(&fa->free_list[MIGRATE_UNMOVABLE]);
+    INIT_LIST_HEAD(&fa->free_list[MIGRATE_RECLAIMABLE]);
+    INIT_LIST_HEAD(&fa->free_list[MIGRATE_MOVABLE]);
+    fa->nr_free = 0;
+
+    struct per_cpu_pages pcp;
+    spin_lock_init(&pcp.lock);
+    pcp.count = 0; pcp.high = 0; pcp.batch = 0;
+    INIT_LIST_HEAD(&pcp.lists[MIGRATE_UNMOVABLE]);
+    INIT_LIST_HEAD(&pcp.lists[MIGRATE_MOVABLE]);
+    (void)pcp.count;
+
+    struct per_cpu_pageset ps;
+    (void)ps.pcp.count;
+
+    struct per_cpu_pages *pcpp = z->per_cpu_pageset;
+    (void)pcpp;
 }
 
 /* memblock: force-use the boot allocator API so signature drift

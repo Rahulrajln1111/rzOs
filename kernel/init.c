@@ -30,6 +30,7 @@
 #include <limine.h>
 #include <x86_64/cpu/percpu.h>
 #include <linux/memblock.h>
+#include <kernel/pmm.h>
 
 
 
@@ -165,6 +166,8 @@ void start_kernel(void)
     serial_putdec(memblock.reserved.cnt);
     serial_write(" region)\r\n");
  
+    /* Boot the buddy allocator off the memblock map we just built. */
+    pmm_init(hhdm_request.response->offset);
 
     phys_addr_t probe = memblock_phys_alloc(64 * 1024, 4096);
     serial_write("MEMBLOCK: phys_alloc(64 KiB) -> ");
@@ -173,11 +176,17 @@ void start_kernel(void)
  
     memblock_phys_free(probe, 64 * 1024);
 
+    u64 frames = pmm_free_frames();
+    serial_write("PPM: total free frames after init = ");
+    serial_putdec(frames);
+    serial_write("\r\n");
     phys_addr_t probe2 = memblock_phys_alloc(64 * 1024, 4096);
     serial_write("MEMBLOCK: re-alloc after free -> ");
     serial_puthex(probe2);
     serial_write(probe2 == probe ? " (same block reused)\r\n"
                                  : " (different block)\r\n");
+
+
 
     /* External interrupts: remap the PIC (IRQ n -> vector 32+n),
      * unmask the LAPIC's LVT0 so the PIC's output can reach the CPU
@@ -201,6 +210,7 @@ void start_kernel(void)
      * Unsigned subtraction wraps safely, so this works even when
      * jiffies rolls past 2^64. */
     u64 last = 0;
+    u64 buddy_stress_ticks = 0;
     for (;;) {
         if (jiffies - last >= 100) {
             this_cpu_inc(per_cpu_counter);
@@ -211,6 +221,20 @@ void start_kernel(void)
             serial_write("]=");
             serial_putdec(this_cpu_read(per_cpu_counter));
 
+            /* Buddy stress test: alloc + free one 4 KiB frame every tick.
+             * If the buddy is consistent, pmm_free_frames() should stay
+             * roughly constant (warm-up may shift it by a few frames).
+             * We print it every 10 ticks to avoid flooding serial. */
+            {
+                phys_addr_t f = pmm_alloc_frame();
+                if (f)
+                    pmm_free_frame(f);
+            }
+            buddy_stress_ticks++;
+            if (buddy_stress_ticks % 10 == 0) {
+                serial_write("  buddy_free=");
+                serial_putdec(pmm_free_frames());
+            }
             serial_write("\r\n");
             last = jiffies;
         }
