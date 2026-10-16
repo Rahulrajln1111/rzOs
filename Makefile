@@ -91,6 +91,12 @@ $(LIMINE_DIR):
 		echo "limine: already present, skipping download"; \
 	fi
 
+# limine.h and the EFI binaries must exist before any kernel source is
+# compiled: on a fresh checkout the clone has to happen first, otherwise
+# the first build races it (and fails) - especially with -j.
+# Order-only (|) so touching the vendored tree does not rebuild objects.
+$(OBJS) check_headers.o: | $(LIMINE_DIR)
+
 # =========================================================
 # IMAGE SETUP
 # =========================================================
