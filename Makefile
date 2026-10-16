@@ -145,8 +145,9 @@ check_headers.o: tests/check_headers.c
 # =========================================================
 
 clean:
-	find kernel lib drivers arch -name '*.o' -delete 2>/dev/null || true
-	rm -f *.o *.elf
+	find kernel lib drivers mm arch tests -name '*.o' -delete 2>/dev/null || true
+	find kernel lib drivers mm arch tests -name '*.d' -delete 2>/dev/null || true
+	rm -f *.o *.d *.elf
 	rm -rf image/EFI
 
 # Remove everything built/generated, including the vendored Limine clone.

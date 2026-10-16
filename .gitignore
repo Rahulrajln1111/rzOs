@@ -7,8 +7,12 @@ limine/
 *.elf
 *.EFI
 *.bin
+*.d
 bmain.o
 bootloader.so
 
 # Generated image output (ESP contents)
 image/
+
+# Prebuilt raw disk image (not referenced by the build; regenerate if needed)
+disk.img
