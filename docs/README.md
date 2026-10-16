@@ -114,8 +114,9 @@ Order is the whole point of this function.
 6. **Per-CPU page caches.** Initialise `per_cpu_pages` for `NR_CPUS` entries
    (`high = batch = 32`).
 
-Observed on QEMU at 256 MiB: `PPM: total free frames after init = 53051`, and
-the count stays put across ticks.
+Observed on QEMU at 256 MiB: `PPM: total free frames after init = ~53050` (the exact
+count varies by a frame or two between builds, since the vmemmap lives inside the
+first usable region), and it stays put across ticks.
 
 ---
 
@@ -261,7 +262,7 @@ simplifications, in Linux terms:
 
 **Works today:** the structures, the zone/vmemmap setup, the memblock → paging →
 `struct page` boot sequence, the 2 MiB identity alias switched in by the kernel
-itself, the frame count (53051 frames / 207 MiB usable in QEMU), and the
+itself, the frame count (~53050 frames / 207 MiB usable in QEMU), and the
 compile-time header harness (`make check`) that force-uses every one of these
 shapes.
 

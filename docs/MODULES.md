@@ -268,7 +268,9 @@ Allocation and free are ported from `mm/page_alloc.c`:
 that the buddy is free and the same order before merging and raising the order.
 
 **Status:** the structures, the boot carve and the two walks are in place, and
-the frame count is stable across timer ticks in QEMU (53051 frames at 256 MiB).
+the frame count is stable across timer ticks in QEMU (~53050 frames at 256 MiB; the
+  exact number moves by a frame or two between builds, since the vmemmap is placed
+  inside the first usable region).
 The lists themselves are not linked yet, so `pmm_alloc_pages()` still returns
 `NULL` and the idle-loop stress test is a no-op. What remains is mechanical and
 listed in [docs/README.md](README.md): link each carved frame onto its order
@@ -306,14 +308,18 @@ PPM: entering pmm_init
 PPM: alias tables starting...
 PPM: alias tables done
 MEMBLOCK: phys_alloc(64 KiB) -> 0x0000000000001000
-PPM: total free frames after init = 53051
+PPM: total free frames after init = 53049
 MEMBLOCK: re-alloc after free -> 0x0000000000001000 (same block reused)
 IRQs: PIC remapped, LAPIC LVT0 unmasked, PIT at 100 Hz
 tick: 100  percpu[0]=1
 tick: 200  percpu[0]=2
 ...
-tick: 1000  percpu[0]=10  buddy_free=53051
+tick: 1000  percpu[0]=10  buddy_free=53049
 ```
+
+The free-frame number shifts by a frame or two from build to build (the vmemmap
+lands inside the first usable region), so read `~53050` as "all of RAM minus what
+the kernel itself occupies".
 
 Each line is one module reporting in: `physical` addresses are printed by the
 serial driver, the frame count comes from the allocator, `percpu[0]=N` is the
