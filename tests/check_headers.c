@@ -16,6 +16,7 @@
 #include <kernel/atomic.h>
 #include <kernel/types.h>
 #include <kernel/compiler.h>
+#include <x86_64/cpu/percpu.h>
 
 /* A stand-in object that owns the list node + atomic counter,
  * like struct page will when the buddy allocator lands. */
@@ -59,6 +60,24 @@ void check_atomic_helpers(void)
     unsigned long flags = spin_lock_irqsave(&lock);
     spin_unlock_irqrestore(&lock, flags);
     spin_unlock(&lock);
+}
+
+/* per-cpu machinery: a per-cpu variable plus every accessor.
+ * These expand to real rdmsr + GS-offset code, so a regression
+ * in the macros must not be able to hide. setup_per_cpu() is
+ * declared here; the definition lives in arch/x86_64/cpu/percpu.c. */
+DEFINE_PER_CPU(int, check_cpu_counter) = 0;
+
+void check_percpu_helpers(void)
+{
+    this_cpu_write(check_cpu_counter, 1);
+    this_cpu_add(check_cpu_counter, 2);
+    (void)this_cpu_inc(check_cpu_counter);
+    (void)this_cpu_read(check_cpu_counter);
+    (void)this_cpu_base();
+    (void)this_cpu_ptr(&check_cpu_counter);
+    (void)smp_processor_id();
+    (void)setup_per_cpu;
 }
 
 /* compiler.h macros are attributes - including the header is

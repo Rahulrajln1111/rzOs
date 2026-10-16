@@ -13,4 +13,8 @@
 #define __always_inline inline __attribute__((always_inline))
 #define __unused        __attribute__((unused))
 
+#define __percpu                        /* sparse-only qualifier; empty for us  */
+#define ____cacheline_aligned_in_smp \
+        __attribute__((__aligned__(64)))  /* SMP: keep per-CPU counters off one cache line */
+
 #endif /* _KERNEL_COMPILER_H */

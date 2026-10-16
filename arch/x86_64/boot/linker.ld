@@ -63,6 +63,14 @@ SECTIONS
         *(COMMON)
     } :data
 
+    . = ALIGN(64);
+    __per_cpu_start = .;
+    .data..percpu : {
+        *(.data..percpu .data..percpu.*)
+    } :data
+    . = ALIGN(64);
+    __per_cpu_end = .;
+    
     /* Discard .note.* and .eh_frame* since they may cause issues on
      * some hosts. */
     /DISCARD/ : {

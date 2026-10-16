@@ -19,6 +19,9 @@
 #include <x86_64/cpu/idt.h>
 #include <x86_64/cpu/lapic.h>
 #include <limine.h>
+#include <x86_64/cpu/percpu.h>
+
+DEFINE_PER_CPU(u64, per_cpu_counter) = 0;
 
 /* ------------------------------------------------------------------ */
 /* Limine boot protocol requests (v11, base revision 6). The bootloader
@@ -104,6 +107,13 @@ void start_kernel(void)
 
     idt_init();
     serial_write("IDT: 256 gates installed\r\n");
+ 
+    setup_per_cpu();
+    serial_write("PERCPU: GS base = ");
+    serial_puthex(rdmsr(MSR_GS_BASE));
+    serial_write(", smp_processor_id() = ");
+    serial_putdec(smp_processor_id());
+    serial_write("\r\n");
 
     print_handoff_info();
 
@@ -130,6 +140,18 @@ void start_kernel(void)
      * jiffies rolls past 2^64. */
     u64 last = 0;
     for (;;) {
+        if (jiffies - last >= 100) {
+            this_cpu_inc(per_cpu_counter);
+            serial_write("tick: ");
+            serial_putdec(jiffies);
+            serial_write("  percpu[");
+            serial_putdec(smp_processor_id());
+            serial_write("]=");
+            serial_putdec(this_cpu_read(per_cpu_counter));
+            serial_write("\r\n");
+            last = jiffies;
+        }
+        
         if (jiffies - last >= 100) {
             serial_write("tick: ");
             serial_putdec(jiffies);
