@@ -24,5 +24,6 @@ typedef signed long long s64;
 
 typedef unsigned long ulong;
 typedef unsigned int  uint;
+typedef u64 phys_addr_t;
 
 #endif /* _KERNEL_TYPES_H */

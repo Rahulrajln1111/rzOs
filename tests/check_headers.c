@@ -13,6 +13,7 @@
  * (Linux analogue: 'make headers_check', subsystem selftests.)
  */
 #include <linux/list.h>
+#include <linux/memblock.h>
 #include <kernel/atomic.h>
 #include <kernel/types.h>
 #include <kernel/compiler.h>
@@ -78,6 +79,24 @@ void check_percpu_helpers(void)
     (void)this_cpu_ptr(&check_cpu_counter);
     (void)smp_processor_id();
     (void)setup_per_cpu;
+}
+
+/* memblock: force-use the boot allocator API so signature drift
+ * can't hide. Calls are safe here: this TU is only COMPILED by
+ * make check, never linked into kernel.elf - nothing executes. */
+void check_memblock_helpers(void)
+{
+    phys_addr_t got = memblock_phys_alloc(4096, 4096);
+    memblock_phys_free(got, 4096);
+    (void)memblock_add(got, 4096);
+    (void)memblock_reserve(got, 4096);
+
+    struct memblock_region r = { .base = 0, .size = 0, .flags = MEMBLOCK_NONE };
+    (void)r.base;
+    (void)memblock.memory.cnt;
+    (void)memblock.reserved.total_size;
+    (void)memblock.bottom_up;
+    (void)memblock.current_limit;
 }
 
 /* compiler.h macros are attributes - including the header is
