@@ -1,3 +1,42 @@
+# rzOs - an x86_64 kernel written from scratch
+
+A small 64-bit kernel written from zero, in the file layout of the Linux tree
+(`arch/ kernel/ mm/ drivers/ lib/ include/`), booted by Limine as a higher-half
+kernel and running on QEMU/OVMF with nothing but a serial console.
+
+**What is implemented so far**
+
+- Limine boot protocol handoff (base revision, framebuffer, HHDM, memory map)
+- 16550 serial console, own GDT, IDT with trap frames and exception dumps
+- 8259 PIC remap, IRQ dispatch + EOI, LAPIC LVT0 unmask, PIT at 100 Hz -> `jiffies`
+- Per-CPU storage on the GS base (`DEFINE_PER_CPU`, `this_cpu_*`, `smp_processor_id()`)
+- `memblock`: the boot memory map plus a first-fit early allocator
+- Early page tables: identity alias of all RAM, `CR3` switched by the kernel
+- Buddy page allocator: `struct page` vmemmap, zone + per-order free areas, the
+  alloc/free walks (free-list linking, splitting and merging still in progress)
+
+**Documentation**
+
+| Document | Contents |
+|---|---|
+| [docs/MODULES.md](docs/MODULES.md) | Module-by-module guide: every subsystem, its files, API, wiring and status |
+| [docs/README.md](docs/README.md) | Deep dive on the page allocator (`mm/pmm.c`) |
+| this file | The bootloader/kernel roadmap the work follows, phase by phase |
+
+**Build and run**
+
+```bash
+make        # compile kernel.elf and assemble the image/ tree
+make run    # boot it in QEMU (256 MiB RAM, serial on stdio)
+make check  # compile-only header harness: every public header is force-used
+```
+
+Requires `gcc`, `ld`, `qemu-system-x86_64`, an OVMF blob at
+`/usr/share/qemu/OVMF.fd`, and network access on the first build (the Limine
+binary release is cloned into `limine/`, which is not committed).
+
+---
+
 # Modern UEFI Bootloader Development Roadmap
 ## Building a Real x86_64 UEFI Bootloader From Scratch
 
@@ -811,22 +850,25 @@ A real modern bootloader should eventually:
 
 ---
 
-# Your Current Position
+# Current Position
+
+Milestones reached in the kernel itself (per-module detail:
+[docs/MODULES.md](docs/MODULES.md)):
 
 ```text
-[✓] UEFI App
-[✓] Filesystem
-[✓] File Loading
-[✓] Memory Allocation
-[✓] ELF Validation
-[ ] ELF Segment Loader
-[ ] GOP
-[ ] Memory Map
-[ ] ExitBootServices
-[ ] Paging
-[ ] Higher-half Kernel
-[ ] ACPI
-[ ] SMP
+[✓] Limine handoff + higher-half kernel entry
+[✓] Serial console, GDT, IDT, exception dumps
+[✓] PIC/LAPIC/PIT interrupts, jiffies, idle loop
+[✓] Spinlocks and atomics
+[✓] Per-CPU storage (GS base, smp_processor_id)
+[✓] memblock memory map + first-fit early allocator
+[✓] Early page tables (identity alias, CR3 switch)
+[~] Buddy page allocator (structures + boot carve; list linking/splitting pending)
+[ ] Virtual memory manager (own MMIO mapping, higher-half ownership)
+[ ] ACPI + SMP bring-up
+[ ] Slab allocator, ELF segment loading, userspace
 ```
 
-You are entering the REAL operating system development stage now.
+The phases above still describe the hand-written UEFI loader in `bootloader/`
+(ESP access, file sizing/reading, ELF validation) and the longer-term
+bootloader goals; the kernel that runs today boots through Limine.
